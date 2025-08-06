@@ -55,7 +55,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
       );
 
       ReadingService().addBook(book);
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     }
   }
 
@@ -116,8 +116,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                             context,
                             MaterialPageRoute(builder: (context) => const BookSearchScreen()),
                           );
-                          if (result == true) {
-                            Navigator.pop(context);
+                          if (result == true && mounted) {
+                            Navigator.pop(context, true);
                           }
                         },
                         icon: const Icon(Icons.search),

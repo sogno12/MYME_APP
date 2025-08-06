@@ -110,7 +110,9 @@ class _BookSearchScreenState extends State<BookSearchScreen> {
       builder: (context) => _AddBookDialog(kakaoBook: kakaoBook),
     ).then((result) {
       if (result == true) {
-        Navigator.pop(context); // 검색 화면 닫기
+        if (mounted) {
+          Navigator.pop(context, true); // 검색 화면 닫고 AddBookScreen으로 true 전달
+        }
       }
     });
   }
@@ -328,8 +330,6 @@ class _AddBookDialogState extends State<_AddBookDialog> {
 
     ReadingService().addBook(book);
     Navigator.pop(context, true); // 현재 다이얼로그 닫기
-    Navigator.pop(context, true); // 검색 화면 닫기
-    Navigator.pop(context, true); // 도서 추가 화면 닫기하여 도서 목록으로 이동
   }
 
   @override

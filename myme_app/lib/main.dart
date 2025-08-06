@@ -525,13 +525,16 @@ class _ReadingLogScreenState extends State<ReadingLogScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const AddBookScreen(),
             ),
-          ).then((_) => setState(() {}));
+          );
+          if (result == true) {
+            setState(() {});
+          }
         },
         child: const Icon(Icons.add),
       ),
