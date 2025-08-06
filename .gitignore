@@ -1,0 +1,58 @@
+# Flutter/Dart/Pub related
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# IDE related  
+**/.idea/
+**/*.iml
+**/.vscode/settings.json
+**/.vscode/launch.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Android Studio build artifacts
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+
+# Symbolication related
+**/app.*.symbols
+
+# Obfuscation related
+**/app.*.map.json
+
+# Miscellaneous
+**/*.class
+**/*.log
+**/*.pyc
+**/*.swp
+**/.buildlog/
+**/.history
+**/.svn/
+**/.swiftpm/
+**/migrate_working_dir/
+
+# Claude Code settings (uncomment if you want to exclude)
+# .claude/
+
+# Local environment files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Coverage reports
+**/coverage/
+**/lcov.info
