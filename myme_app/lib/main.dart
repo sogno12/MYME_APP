@@ -8,6 +8,7 @@ import 'screens/add_book_screen.dart';
 import 'screens/book_detail_screen.dart';
 import 'screens/edit_book_screen.dart';
 import 'screens/edit_session_screen.dart';
+import 'screens/todays_habits_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const DashboardScreen(),
     const SchedulerScreen(),
-    const HabitTrackerScreen(),
+    const TodaysHabitsScreen(),
     const ReadingLogScreen(),
     const DiaryScreen(),
   ];
@@ -133,32 +134,6 @@ class SchedulerScreen extends StatelessWidget {
             Text('Schedule & Calendar', style: TextStyle(fontSize: 24)),
             SizedBox(height: 8),
             Text('Your events and appointments'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class HabitTrackerScreen extends StatelessWidget {
-  const HabitTrackerScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Habit Tracker'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, size: 64),
-            SizedBox(height: 16),
-            Text('Habit Tracker', style: TextStyle(fontSize: 24)),
-            SizedBox(height: 8),
-            Text('Track your daily habits and streaks'),
           ],
         ),
       ),
