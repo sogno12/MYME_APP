@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../services/reading_service.dart';
+import '../services/app_service.dart';
 import '../utils/date_formatter.dart';
+import 'book_search_screen.dart';
 
 class AddBookScreen extends StatefulWidget {
   const AddBookScreen({super.key});
@@ -72,9 +74,100 @@ class _AddBookScreenState extends State<AddBookScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+        child: ListenableBuilder(
+          listenable: AppService(),
+          builder: (context, child) => ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+            // API 연결 확인 중일 때 로딩 표시
+            if (AppService().isCheckingConnectivity) ...[
+              Card(
+                color: Colors.blue.withOpacity(0.1),
+                child: const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('도서 검색 기능 확인 중...', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ]
+            // 카카오 API 사용 가능한 경우에만 검색 영역 표시
+            else if (AppService().isKakaoApiAvailable) ...[
+              Card(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.search, size: 32),
+                      const SizedBox(height: 8),
+                      const Text('도서 검색으로 간편하게 추가하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('카카오 도서 검색을 통해 도서 정보를 자동으로 가져올 수 있습니다'),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(builder: (context) => const BookSearchScreen()),
+                          );
+                          if (result == true) {
+                            Navigator.pop(context);
+                          }
+                        },
+                        icon: const Icon(Icons.search),
+                        label: const Text('도서 검색하기'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('또는 직접 입력', style: TextStyle(color: Colors.grey)),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ] else ...[
+              // API 사용 불가능한 경우 안내 메시지 (선택적)
+              if (!AppService().isCheckingConnectivity)
+                Card(
+                  color: Colors.orange.withOpacity(0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.info_outline, size: 32, color: Colors.orange),
+                        const SizedBox(height: 8),
+                        const Text('도서 검색 기능 사용 불가', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        const Text('카카오 API 키가 설정되지 않았거나 인터넷 연결을 확인해주세요'),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await AppService().refreshApiStatus();
+                            // ListenableBuilder가 자동으로 UI를 갱신
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('다시 시도'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+            ],
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -280,7 +373,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
               ),
               maxLines: 3,
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

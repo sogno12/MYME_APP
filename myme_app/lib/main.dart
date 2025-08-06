@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'models/book.dart';
 import 'services/reading_service.dart';
+import 'services/app_service.dart';
 import 'utils/date_formatter.dart';
 import 'screens/add_book_screen.dart';
 import 'screens/book_detail_screen.dart';
 import 'screens/edit_book_screen.dart';
 import 'screens/edit_session_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+  
+  // 앱 서비스 초기화
+  await AppService().initializeApp();
+  
   runApp(const MyMeApp());
 }
 
