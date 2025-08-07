@@ -7,6 +7,7 @@ import 'package:myme_app/services/habit_service.dart';
 import 'package:myme_app/services/tag_service.dart';
 import 'package:myme_app/models/tag.dart';
 import 'package:uuid/uuid.dart';
+import 'package:myme_app/widgets/emoji_selection_dialog.dart';
 
 class AddHabitScreen extends StatefulWidget {
   final Habit? habit; // 기존 습관을 수정할 경우 전달받을 Habit 객체
@@ -21,10 +22,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final _emojiController = TextEditingController(text: '😊');
+  String _selectedEmoji = '😊'; // 이모지 선택을 위한 변수
 
   // --- State Variables ---
   HabitTrackingType _selectedTrackingType = HabitTrackingType.checkOnly;
+  String? _goalUnit;
   bool _showLogEditorOnCheck = false; // <<<< 오류의 원인이었던 변수 선언
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
@@ -40,8 +42,9 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
     if (widget.habit != null) {
       _titleController.text = widget.habit!.title;
       _contentController.text = widget.habit!.content ?? '';
-      _emojiController.text = widget.habit!.emoji;
+      _selectedEmoji = widget.habit!.emoji; // 이모지 로드
       _selectedTrackingType = widget.habit!.trackingType;
+      _goalUnit = widget.habit!.goalUnit;
       _showLogEditorOnCheck = widget.habit!.showLogEditorOnCheck;
       _startDate = widget.habit!.startDate;
       _endDate = widget.habit!.endDate;
@@ -191,10 +194,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
           id: const Uuid().v4(),
           title: _titleController.text,
           content: _contentController.text.isEmpty ? '' : _contentController.text,
-          emoji: _emojiController.text,
+          emoji: _selectedEmoji, // 선택된 이모지 사용
           startDate: startDate,
           endDate: endDate,
           trackingType: _selectedTrackingType,
+          goalUnit: _goalUnit,
           showLogEditorOnCheck: _showLogEditorOnCheck,
           tagIds: _selectedTagIds,
         );
@@ -206,10 +210,11 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         final updatedHabit = widget.habit!.copyWith(
           title: _titleController.text,
           content: _contentController.text.isEmpty ? '' : _contentController.text,
-          emoji: _emojiController.text,
+          emoji: _selectedEmoji, // 선택된 이모지 사용
           startDate: startDate,
           endDate: endDate,
           trackingType: _selectedTrackingType,
+          goalUnit: _goalUnit,
           showLogEditorOnCheck: _showLogEditorOnCheck,
           tagIds: _selectedTagIds,
         );
@@ -248,11 +253,23 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                 controller: _contentController,
                 decoration: const InputDecoration(labelText: 'Content (Optional)'),
               ),
-              TextFormField(
-                controller: _emojiController,
-                decoration: const InputDecoration(labelText: 'Emoji'),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Please enter an emoji' : null,
+              ListTile(
+                title: const Text('Emoji'),
+                trailing: Text(
+                  _selectedEmoji,
+                  style: const TextStyle(fontSize: 28),
+                ),
+                onTap: () async {
+                  final selectedEmoji = await showDialog<String>(
+                    context: context,
+                    builder: (context) => EmojiSelectionDialog(currentEmoji: _selectedEmoji),
+                  );
+                  if (selectedEmoji != null) {
+                    setState(() {
+                      _selectedEmoji = selectedEmoji;
+                    });
+                  }
+                },
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<HabitTrackingType>(
@@ -270,6 +287,14 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                   });
                 },
               ),
+              if (_selectedTrackingType != HabitTrackingType.checkOnly)
+                TextFormField(
+                  initialValue: _goalUnit,
+                  decoration: const InputDecoration(labelText: 'Unit (e.g., min, %, count)'),
+                  onChanged: (value) {
+                    _goalUnit = value;
+                  },
+                ),
               const SizedBox(height: 20),
               ListTile(
                 title: Text("Start Date: ${DateFormat('yyyy/MM/dd').format(_startDate)}"),

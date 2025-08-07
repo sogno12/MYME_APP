@@ -83,6 +83,12 @@ class HabitService {
 
   // --- HabitLog CRUD ---
 
+  // 모든 로그 가져오기
+  Future<List<HabitLog>> getAllLogs() async {
+    await Future.delayed(const Duration(milliseconds: 50));
+    return List.from(_logs);
+  }
+
   // 특정 습관의 모든 로그 가져오기
   Future<List<HabitLog>> getLogsForHabit(String habitId) async {
     return _logs.where((log) => log.habitId == habitId).toList();

@@ -9,6 +9,10 @@ import 'screens/add_book_screen.dart';
 import 'screens/book_detail_screen.dart';
 import 'screens/edit_book_screen.dart';
 import 'screens/edit_session_screen.dart';
+import 'package:myme_app/models/habit.dart';
+import 'package:myme_app/models/habit_log.dart';
+import 'package:myme_app/services/habit_service.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'screens/todays_habits_screen.dart';
 
 void main() async {
@@ -99,8 +103,68 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final HabitService _habitService = HabitService();
+  List<Habit> _allHabits = [];
+  List<HabitLog> _allLogs = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final habits = await _habitService.getAllHabits();
+      final logs = await _habitService.getAllLogs(); // HabitService에 getAllLogs 추가 필요
+      setState(() {
+        _allHabits = habits;
+        _allLogs = logs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load dashboard data: \$e')),
+      );
+    }
+  }
+
+  // 주간/월간 달성률 계산 로직 (예시)
+  double _getWeeklyCompletionRate() {
+    if (_allLogs.isEmpty) return 0.0;
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // 월요일 기준
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+    final weeklyLogs = _allLogs.where((log) =>
+        log.date.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
+        log.date.isBefore(endOfWeek.add(const Duration(days: 1))) &&
+        log.isCompleted).toList();
+
+    // 간단한 예시: 주간 완료된 로그 수 / (주간 활성화된 습관 수 * 7일)
+    // 실제로는 더 복잡한 로직이 필요합니다.
+    return weeklyLogs.length / (_allHabits.length * 7);
+  }
+
+  // 각 습관별 달성률 계산 로직 (예시)
+  double _getHabitCompletionRate(Habit habit) {
+    if (_allLogs.isEmpty) return 0.0;
+    final habitLogs = _allLogs.where((log) => log.habitId == habit.id && log.isCompleted).toList();
+    // 간단한 예시: 완료된 로그 수 / 전체 로그 수
+    // 실제로는 습관의 시작일, 종료일, 빈도 등을 고려해야 합니다.
+    return habitLogs.isEmpty ? 0.0 : habitLogs.length / _allLogs.where((log) => log.habitId == habit.id).length;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,24 +173,124 @@ class DashboardScreen extends StatelessWidget {
         title: const Text('Dashboard'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.dashboard, size: 64),
-            SizedBox(height: 16),
-            Text('Welcome to MyMe!', style: TextStyle(fontSize: 24)),
-            SizedBox(height: 8),
-            Text('Your daily overview will appear here'),
-          ],
-        ),
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Overall Progress',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Weekly Completion: ${(_getWeeklyCompletionRate() * 100).toStringAsFixed(1)}%',
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                          // 추가적인 통계 및 차트
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Habit Breakdown',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _allHabits.isEmpty
+                      ? const Center(
+                          child: Text('No habits to display progress.'),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _allHabits.length,
+                          itemBuilder: (context, index) {
+                            final habit = _allHabits[index];
+                            final completionRate = _getHabitCompletionRate(habit);
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: Text(habit.emoji, style: const TextStyle(fontSize: 28)),
+                                title: Text(habit.title),
+                                subtitle: LinearProgressIndicator(
+                                  value: completionRate,
+                                  backgroundColor: Colors.grey[300],
+                                  color: Colors.green,
+                                ),
+                                trailing: Text(
+                                  '${(completionRate * 100).toStringAsFixed(1)}%',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ],
+              ),
+            ),
     );
   }
 }
 
-class SchedulerScreen extends StatelessWidget {
+class SchedulerScreen extends StatefulWidget {
   const SchedulerScreen({super.key});
+
+  @override
+  State<SchedulerScreen> createState() => _SchedulerScreenState();
+}
+
+class _SchedulerScreenState extends State<SchedulerScreen> {
+  final HabitService _habitService = HabitService();
+  List<Habit> _allHabits = [];
+  List<HabitLog> _allLogs = [];
+  bool _isLoading = true;
+
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  DateTime? _rangeStart;
+  DateTime? _rangeEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final habits = await _habitService.getAllHabits();
+      final logs = await _habitService.getAllLogs();
+      setState(() {
+        _allHabits = habits;
+        _allLogs = logs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load calendar data: \$e')),
+      );
+    }
+  }
+
+  List<HabitLog> _getLogsForDay(DateTime day) {
+    return _allLogs.where((log) =>
+        log.date.year == day.year &&
+        log.date.month == day.month &&
+        log.date.day == day.day &&
+        log.isCompleted).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,19 +299,99 @@ class SchedulerScreen extends StatelessWidget {
         title: const Text('Schedule'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.calendar_today, size: 64),
-            SizedBox(height: 16),
-            Text('Schedule & Calendar', style: TextStyle(fontSize: 24)),
-            SizedBox(height: 8),
-            Text('Your events and appointments'),
-          ],
-        ),
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                TableCalendar(
+                  focusedDay: _focusedDay,
+                  firstDay: DateTime.utc(2000, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  selectedDayPredicate: (day) {
+                    return isSameDay(_selectedDay, day);
+                  },
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  eventLoader: _getLogsForDay,
+                  calendarFormat: CalendarFormat.month,
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: false,
+                    titleCentered: true,
+                  ),
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    selectedDecoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  calendarBuilders: CalendarBuilders(
+                    markerBuilder: (context, date, events) {
+                      if (events.isNotEmpty) {
+                        return Positioned(
+                          right: 1,
+                          bottom: 1,
+                          child: Wrap(
+                            spacing: 2.0,
+                            runSpacing: 0.0,
+                            children: events.map((event) {
+                              final log = event as HabitLog;
+                              final habit = _allHabits.firstWhere((h) => h.id == log.habitId, orElse: () => Habit(id: log.habitId, title: 'Unknown Habit', content: '', emoji: '❓', startDate: DateTime.now(), trackingType: HabitTrackingType.checkOnly));
+                              return Text(
+                                habit.emoji,
+                                style: const TextStyle(fontSize: 10),
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Expanded(
+                  child: _selectedDay == null
+                      ? const Center(child: Text('Select a day to see logs.'))
+                      : ListView.builder(
+                          itemCount: _getLogsForDay(_selectedDay!).length,
+                          itemBuilder: (context, index) {
+                            final log = _getLogsForDay(_selectedDay!)[index];
+                            final habit = _allHabits.firstWhere((h) => h.id == log.habitId, orElse: () => Habit(id: log.habitId, title: 'Unknown Habit', content: '', emoji: '❓', startDate: DateTime.now(), trackingType: HabitTrackingType.checkOnly));
+                            return ListTile(
+                              leading: Text(habit.emoji, style: const TextStyle(fontSize: 24)),
+                              title: Text(habit.title),
+                              subtitle: Text(_getLogSummary(log, habit)),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
     );
+  }
+
+  String _getLogSummary(HabitLog log, Habit habit) {
+    if (!log.isCompleted && (log.memo == null || log.memo!.isEmpty)) {
+      return 'Not completed';
+    }
+    List<String> parts = [];
+    if (log.timeValue != null) parts.add('Time: ${log.timeValue}${habit.goalUnit ?? 'm'}');
+    if (log.percentageValue != null) parts.add('${log.percentageValue}${habit.goalUnit ?? '%'}');
+    if (log.quantityValue != null) parts.add('Count: ${log.quantityValue}${habit.goalUnit ?? ''}');
+    if (log.memo != null && log.memo!.isNotEmpty) parts.add(log.memo!);
+    
+    if (parts.isEmpty) {
+        return log.isCompleted ? 'Completed' : 'Not completed';
+    }
+    return parts.join(' / ');
   }
 }
 

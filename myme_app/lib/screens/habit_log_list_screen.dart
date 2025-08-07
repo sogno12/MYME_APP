@@ -1,6 +1,7 @@
 // lib/screens/habit_log_list_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:myme_app/models/habit.dart';
 import 'package:myme_app/models/habit_log.dart';
 import 'package:myme_app/models/tag.dart';
@@ -73,7 +74,7 @@ class _HabitLogListScreenState extends State<HabitLogListScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load logs: \$e')),
+        SnackBar(content: Text('Failed to load logs: $e')),
       );
     }
   }
@@ -95,6 +96,7 @@ class _HabitLogListScreenState extends State<HabitLogListScreen> {
   }
 
   Future<void> _showLogEditorDialog(HabitLog? existingLog) async {
+    final _formKey = GlobalKey<FormState>();
     final isNewLog = existingLog == null;
     final logToEdit = existingLog ?? HabitLog(id: const Uuid().v4(), habitId: widget.habit.id, date: DateTime.now());
 
@@ -112,72 +114,101 @@ class _HabitLogListScreenState extends State<HabitLogListScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(isNewLog ? 'Add Log' : 'Edit Log'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      title: Text("Date: ${DateFormat('yyyy/MM/dd').format(selectedDate)}"),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final DateTime? picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2101),
-                        );
-                        if (picked != null && picked != selectedDate) {
-                          setDialogState(() {
-                            selectedDate = DateTime(picked.year, picked.month, picked.day);
-                          });
-                        }
-                      },
-                    ),
-                    SwitchListTile(
-                      title: const Text('Mark as Completed'),
-                      value: isCompleted,
-                      onChanged: (value) => setDialogState(() => isCompleted = value),
-                    ),
-                    TextFormField(
-                      controller: timeController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Time (minutes)'),
-                    ),
-                    TextFormField(
-                      controller: percentController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Percentage (%)'),
-                    ),
-                    TextFormField(
-                      controller: quantityController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Quantity / Count'),
-                    ),
-                    TextFormField(
-                      controller: memoController,
-                      decoration: const InputDecoration(labelText: 'Memo (Optional)'),
-                    ),
-                  ],
+              content: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        title: Text("Date: ${DateFormat('yyyy/MM/dd').format(selectedDate)}"),
+                        trailing: const Icon(Icons.calendar_today),
+                        onTap: () async {
+                          final DateTime? picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2101),
+                          );
+                          if (picked != null && picked != selectedDate) {
+                            setDialogState(() {
+                              selectedDate = DateTime(picked.year, picked.month, picked.day);
+                            });
+                          }
+                        },
+                      ),
+                      SwitchListTile(
+                        title: const Text('Mark as Completed'),
+                        value: isCompleted,
+                        onChanged: (value) => setDialogState(() => isCompleted = value),
+                      ),
+                      TextFormField(
+                        controller: timeController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: const InputDecoration(labelText: 'Time (minutes)'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return null;
+                          final n = int.tryParse(value);
+                          if (n == null) return 'Please enter a valid number.';
+                          if (n < 0) return 'Time must be non-negative.';
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: percentController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: const InputDecoration(labelText: 'Percentage (%)'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return null;
+                          final n = int.tryParse(value);
+                          if (n == null) return 'Please enter a valid number.';
+                          if (n < 0 || n > 100) return 'Percentage must be between 0 and 100.';
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: quantityController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: const InputDecoration(labelText: 'Quantity / Count'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return null;
+                          final n = int.tryParse(value);
+                          if (n == null) return 'Please enter a valid number.';
+                          if (n < 0) return 'Quantity must be non-negative.';
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: memoController,
+                        decoration: const InputDecoration(labelText: 'Memo (Optional)'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: () {
-                    final updatedLog = HabitLog(
-                      id: logToEdit.id,
-                      habitId: widget.habit.id,
-                      date: selectedDate, // 선택된 날짜 사용
-                      isCompleted: isCompleted,
-                      timeValue: int.tryParse(timeController.text),
-                      percentageValue: int.tryParse(percentController.text),
-                      quantityValue: int.tryParse(quantityController.text),
-                      memo: memoController.text,
-                    );
-                    _habitService.addOrUpdateLog(updatedLog).then((_) {
-                      Navigator.pop(context);
-                      _loadLogsAndTags();
-                    });
+                    if (_formKey.currentState!.validate()) {
+                      final updatedLog = HabitLog(
+                        id: logToEdit.id,
+                        habitId: widget.habit.id,
+                        date: selectedDate, // 선택된 날짜 사용
+                        isCompleted: isCompleted,
+                        timeValue: int.tryParse(timeController.text),
+                        percentageValue: int.tryParse(percentController.text),
+                        quantityValue: int.tryParse(quantityController.text),
+                        memo: memoController.text,
+                      );
+                      _habitService.addOrUpdateLog(updatedLog).then((_) {
+                        Navigator.pop(context);
+                        _loadLogsAndTags();
+                      });
+                    }
                   },
                   child: const Text('Save'),
                 ),
@@ -217,7 +248,7 @@ class _HabitLogListScreenState extends State<HabitLogListScreen> {
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete log: \$e')),
+          SnackBar(content: Text('Failed to delete log: $e')),
         );
       }
     }
