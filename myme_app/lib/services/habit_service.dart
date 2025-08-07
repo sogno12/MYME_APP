@@ -69,6 +69,18 @@ class HabitService {
     _logs.removeWhere((log) => log.habitId == habitId);
   }
 
+  // 모든 습관에서 특정 태그 ID 제거
+  Future<void> removeTagFromAllHabits(String tagId) async {
+    for (int i = 0; i < _habits.length; i++) {
+      if (_habits[i].tagIds.contains(tagId)) {
+        _habits[i] = _habits[i].copyWith(
+          tagIds: List.from(_habits[i].tagIds)..remove(tagId),
+        );
+      }
+    }
+    await Future.delayed(const Duration(milliseconds: 50));
+  }
+
   // --- HabitLog CRUD ---
 
   // 특정 습관의 모든 로그 가져오기
@@ -91,9 +103,11 @@ class HabitService {
     final index = _logs.indexWhere((l) => l.habitId == log.habitId && formatter.format(l.date) == logDateString);
     
     if (index != -1) {
-      _logs[index] = log;
+      // 기존 로그 업데이트
+      _logs[index] = log.copyWith(updatedAt: DateTime.now());
     } else {
-      _logs.add(log);
+      // 새 로그 추가
+      _logs.add(log.copyWith(createdAt: DateTime.now()));
     }
   }
 

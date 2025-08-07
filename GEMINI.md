@@ -10,3 +10,18 @@
 - 사용자는 습관을 생성, 수정, 삭제할 수 있습니다.
 - 사용자는 특정 날짜에 습관을 완료했음을 표시할 수 있습니다.
 - 애플리케이션은 습관 달성 현황 및 연속 기록(streaks)을 시각적으로 보여주는 기능을 제공해야 합니다.
+
+### 현재까지 완성된 기능:
+- 오늘의 습관 선택 및 완료 표시 (습관 생성 및 당일 기록)
+- 전체 습관 목록 조회 기능
+- 습관 수정 기능
+- 습관 삭제 기능
+- 날짜 선택기 `yyyy/MM/dd` 형식으로 변경
+- 태그 관리 기능 (생성, 수정, 삭제)
+- `TodaysHabitsScreen` 및 `AllHabitsScreen`에서 태그 및 제목으로 습관 필터링 기능
+- `AllHabitsScreen`에서 습관 탭 시 해당 습관의 로그 목록 화면 (`HabitLogListScreen`)으로 이동
+- `HabitLog` 모델에 `createdAt`, `updatedAt` 필드 추가
+- `HabitLogListScreen`에서 로그 목록을 `logDate`, `createdAt`, `updatedAt` 기준으로 정렬 기능
+
+### 앞으로 추가해야 할 기능:
+- 습관 달성 현황 및 연속 기록(streaks) 시각화 기능

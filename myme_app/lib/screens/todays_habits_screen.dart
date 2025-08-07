@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:myme_app/models/habit.dart';
 import 'package:myme_app/models/habit_log.dart';
 import 'package:myme_app/services/habit_service.dart';
+import 'package:myme_app/services/tag_service.dart';
+import 'package:myme_app/models/tag.dart';
 import 'package:myme_app/screens/add_habit_screen.dart';
+import 'package:myme_app/screens/all_habits_screen.dart';
+import 'package:myme_app/screens/all_tags_screen.dart';
 import 'package:uuid/uuid.dart';
 
 class TodaysHabitsScreen extends StatefulWidget {
@@ -16,10 +20,16 @@ class TodaysHabitsScreen extends StatefulWidget {
 
 class _TodaysHabitsScreenState extends State<TodaysHabitsScreen> {
   final HabitService _habitService = HabitService();
+  final TagService _tagService = TagService();
   
   List<Habit> _todaysHabits = [];
   Map<String, HabitLog> _todaysLogs = {}; // <habitId, HabitLog>
+  List<Tag> _allTags = []; // 모든 태그를 저장할 리스트
   bool _isLoading = true;
+
+  List<String> _selectedFilterTagIds = []; // 필터링에 사용될 태그 ID 목록
+  String _searchQuery = ''; // 검색어
+  bool _isSearching = false; // 검색 바 표시 여부
 
   @override
   void initState() {
@@ -30,17 +40,32 @@ class _TodaysHabitsScreenState extends State<TodaysHabitsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final habits = await _habitService.getTodaysHabits();
+      final allHabits = await _habitService.getTodaysHabits();
       final logs = await _habitService.getLogsForDate(DateTime.now());
+      final tags = await _tagService.getAllTags();
+
+      List<Habit> filteredHabits = allHabits.where((habit) {
+        // 제목 필터링
+        final matchesSearchQuery = _searchQuery.isEmpty ||
+            habit.title.toLowerCase().contains(_searchQuery.toLowerCase());
+
+        // 태그 필터링
+        final matchesTags = _selectedFilterTagIds.isEmpty ||
+            _selectedFilterTagIds.any((tagId) => habit.tagIds.contains(tagId));
+
+        return matchesSearchQuery && matchesTags;
+      }).toList();
+
       setState(() {
-        _todaysHabits = habits;
+        _todaysHabits = filteredHabits;
         _todaysLogs = {for (var log in logs) log.habitId: log};
+        _allTags = tags;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load data: $e')),
+        SnackBar(content: Text('Failed to load data: \$e')),
       );
     }
   }
@@ -53,6 +78,83 @@ class _TodaysHabitsScreenState extends State<TodaysHabitsScreen> {
     if (result == true) {
       _loadData();
     }
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = ''; // 검색 바 닫을 때 검색어 초기화
+        _loadData();
+      }
+    });
+  }
+
+  Future<void> _showTagFilterDialog() async {
+    final List<String> tempSelectedTagIds = List.from(_selectedFilterTagIds);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Filter by Tags'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            tempSelectedTagIds.clear();
+                          });
+                        },
+                        child: const Text('Clear All'),
+                      ),
+                    ),
+                    ..._allTags.map((tag) {
+                      final isSelected = tempSelectedTagIds.contains(tag.id);
+                      return CheckboxListTile(
+                        title: Text(tag.name),
+                        value: isSelected,
+                        onChanged: (selected) {
+                          setDialogState(() {
+                            if (selected == true) {
+                              tempSelectedTagIds.add(tag.id);
+                            } else {
+                              tempSelectedTagIds.remove(tag.id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedFilterTagIds = List.from(tempSelectedTagIds);
+                      _loadData(); // 필터 적용 후 데이터 새로고침
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _onCheckboxChanged(bool? value, Habit habit) {
@@ -159,11 +261,59 @@ class _TodaysHabitsScreenState extends State<TodaysHabitsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Today's Habits"),
+        title: _isSearching
+            ? TextField(
+                decoration: const InputDecoration(
+                  hintText: 'Search habits...',
+                  border: InputBorder.none,
+                ),
+                autofocus: true,
+                onChanged: (query) {
+                  setState(() {
+                    _searchQuery = query;
+                    _loadData();
+                  });
+                },
+              )
+            : const Text("Today's Habits"),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: _toggleSearch,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.filter_list,
+              color: _selectedFilterTagIds.isNotEmpty ? Colors.blue : null,
+            ),
+            onPressed: _showTagFilterDialog,
+          ),
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            onPressed: () { /* TODO: 전체 습관 목록 화면으로 이동 */ },
+            onSelected: (String result) {
+              if (result == 'all_habits') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AllHabitsScreen()),
+                );
+              } else if (result == 'all_tags') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AllTagsScreen()),
+                );
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'all_habits',
+                child: Text('All Habits'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'all_tags',
+                child: Text('Manage Tags'),
+              ),
+            ],
           ),
         ],
       ),
@@ -190,7 +340,31 @@ class _TodaysHabitsScreenState extends State<TodaysHabitsScreen> {
         return ListTile(
           leading: Text(habit.emoji, style: const TextStyle(fontSize: 24)),
           title: Text(habit.title),
-          subtitle: log != null ? Text(_getLogSummary(log)) : null,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (log != null) Text(_getLogSummary(log)),
+              if (habit.tagIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Wrap(
+                    spacing: 6.0,
+                    runSpacing: 0.0,
+                    children: habit.tagIds.map((tagId) {
+                      final tag = _allTags.firstWhere(
+                        (t) => t.id == tagId,
+                        orElse: () => Tag(id: tagId, name: 'Unknown'),
+                      );
+                      return Chip(
+                        label: Text(tag.name, style: const TextStyle(fontSize: 10)),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      );
+                    }).toList(),
+                  ),
+                ),
+            ],
+          ),
           trailing: Checkbox(
             value: isCompleted,
             onChanged: (bool? value) => _onCheckboxChanged(value, habit),
