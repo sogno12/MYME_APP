@@ -8,28 +8,58 @@ import 'dart:convert';
 
 class DatabaseHelper {
   static final _databaseName = "MyMe.db";
-  // isAdmin 컬럼 추가를 위해 버전을 6으로 올립니다.
-  static final _databaseVersion = 6;
+  static final _databaseVersion = 7;
 
-  // 테이블 이름
+  // --- 테이블 이름 ---
   static final usersTable = 'users';
   static final systemSettingsTable = 'system_settings';
   static final userSettingsTable = 'user_settings';
+  static final booksTable = 'books';
+  static final readLogsTable = 'read_logs';
 
-  // 공통 컬럼
+  // --- 공통 컬럼 ---
   static final columnId = '_id';
-  static final columnSettingKey = 'key';
-  static final columnSettingValue = 'value';
 
-  // users 테이블 컬럼
+  // --- users 테이블 컬럼 ---
   static final columnEmail = 'email';
   static final columnPassword = 'password';
   static final columnName = 'name';
   static final columnNickname = 'nickname';
-  static final columnIsAdmin = 'isAdmin'; // isAdmin 컬럼 추가
+  static final columnIsAdmin = 'isAdmin';
 
-  // user_settings 테이블 컬럼
+  // --- settings 테이블 공통 컬럼 ---
+  static final columnSettingKey = 'key';
+  static final columnSettingValue = 'value';
   static final columnUserId = 'user_id';
+
+  // --- books, read_logs 공통 컬럼 ---
+  static final columnCreatedAt = 'created_at';
+  static final columnUpdatedAt = 'updated_at';
+  static final columnOwnerId = 'owner_id';
+  static final columnCreatedBy = 'created_by';
+  static final columnUpdatedBy = 'updated_by';
+
+  // --- books 테이블 컬럼 ---
+  static final columnTitle = 'title';
+  static final columnAuthors = 'authors';
+  static final columnPublisher = 'publisher';
+  static final columnIsbn = 'isbn';
+  static final columnTotalPages = 'total_pages';
+  static final columnThumbnailUrl = 'thumbnail_url';
+  static final columnTranslators = 'translators';
+  static final columnStatus = 'status';
+  static final columnRating = 'rating';
+  static final columnNotes = 'notes';
+  static final columnManualStartDate = 'manual_start_date';
+  static final columnManualEndDate = 'manual_end_date';
+
+  // --- read_logs 테이블 컬럼 ---
+  static final columnBookId = 'book_id';
+  static final columnReadingDate = 'reading_date';
+  static final columnEndPage = 'end_page';
+  static final columnDuration = 'duration';
+  static final columnMood = 'mood';
+
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
@@ -51,7 +81,6 @@ class DatabaseHelper {
   }
 
   Future _onCreate(Database db, int version) async {
-    // users 테이블 생성 (isAdmin 컬럼 추가)
     await db.execute('''
           CREATE TABLE $usersTable (
             $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +92,6 @@ class DatabaseHelper {
           )
           ''');
     
-    // system_settings 테이블 생성
     await db.execute('''
           CREATE TABLE $systemSettingsTable (
             $columnSettingKey TEXT PRIMARY KEY,
@@ -71,7 +99,6 @@ class DatabaseHelper {
           )
           ''');
 
-    // user_settings 테이블 생성
     await db.execute('''
           CREATE TABLE $userSettingsTable (
             $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,12 +110,52 @@ class DatabaseHelper {
           )
           ''');
 
+    await db.execute('''
+          CREATE TABLE $booksTable (
+            $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
+            $columnCreatedAt TEXT NOT NULL,
+            $columnUpdatedAt TEXT NOT NULL,
+            $columnOwnerId INTEGER NOT NULL,
+            $columnCreatedBy INTEGER NOT NULL,
+            $columnUpdatedBy INTEGER NOT NULL,
+            $columnTitle TEXT NOT NULL,
+            $columnAuthors TEXT NOT NULL,
+            $columnPublisher TEXT,
+            $columnIsbn TEXT,
+            $columnTotalPages INTEGER,
+            $columnThumbnailUrl TEXT,
+            $columnTranslators TEXT,
+            $columnStatus TEXT NOT NULL,
+            $columnRating REAL,
+            $columnNotes TEXT,
+            $columnManualStartDate TEXT,
+            $columnManualEndDate TEXT,
+            FOREIGN KEY ($columnOwnerId) REFERENCES $usersTable ($columnId) ON DELETE CASCADE
+          )
+          ''');
+
+    await db.execute('''
+          CREATE TABLE $readLogsTable (
+            $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
+            $columnCreatedAt TEXT NOT NULL,
+            $columnUpdatedAt TEXT NOT NULL,
+            $columnOwnerId INTEGER NOT NULL,
+            $columnCreatedBy INTEGER NOT NULL,
+            $columnUpdatedBy INTEGER NOT NULL,
+            $columnBookId INTEGER NOT NULL,
+            $columnReadingDate TEXT NOT NULL,
+            $columnEndPage INTEGER NOT NULL,
+            $columnDuration INTEGER,
+            $columnNotes TEXT,
+            $columnMood TEXT,
+            FOREIGN KEY ($columnBookId) REFERENCES $booksTable ($columnId) ON DELETE CASCADE
+          )
+          ''');
+
     await _insertDefaultData(db);
   }
 
-  // 기본 데이터 추가 (sogno 계정에 isAdmin 플래그 설정)
   Future<void> _insertDefaultData(Database db) async {
-    // 1. 기본 시스템 설정 추가
     for (var featureKey in availableFeatures.keys) {
       await db.insert(systemSettingsTable, {
         columnSettingKey: featureKey,
@@ -96,7 +163,6 @@ class DatabaseHelper {
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
-    // 2. 기본 관리자 계정(sogno) 생성 (isAdmin: 1)
     final password = '1234';
     final bytes = utf8.encode(password);
     final hashedPassword = sha256.convert(bytes).toString();
@@ -105,10 +171,9 @@ class DatabaseHelper {
       columnEmail: 'sogno',
       columnPassword: hashedPassword,
       columnNickname: 'sogno',
-      columnIsAdmin: 1 // 관리자 플래그를 true(1)로 설정
+      columnIsAdmin: 1
     });
 
-    // 3. 생성된 관리자 계정의 사용자 설정 추가
     final systemSettings = await db.query(systemSettingsTable);
     for (var setting in systemSettings) {
       await db.insert(userSettingsTable, {
@@ -120,17 +185,17 @@ class DatabaseHelper {
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // 기존 테이블들을 삭제하고 새로 생성 (데이터는 유지되지 않음)
     await db.execute('DROP TABLE IF EXISTS $usersTable');
     await db.execute('DROP TABLE IF EXISTS $systemSettingsTable');
     await db.execute('DROP TABLE IF EXISTS $userSettingsTable');
+    await db.execute('DROP TABLE IF EXISTS $booksTable');
+    await db.execute('DROP TABLE IF EXISTS $readLogsTable');
     await _onCreate(db, newVersion);
   }
 
   // --- User 관련 함수 ---
   Future<int> insertUser(Map<String, dynamic> row) async {
     Database db = await instance.database;
-    // isAdmin은 테이블에서 DEFAULT 0으로 처리되므로 별도 지정 필요 없음
     final userId = await db.insert(usersTable, row);
     await createUserSettings(userId);
     return userId;
@@ -226,5 +291,142 @@ class DatabaseHelper {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  // --- Book Log 관련 함수 ---
+
+  // Book C.R.U.D.
+  Future<int> insertBook(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    return await db.insert(booksTable, row);
+  }
+
+  Future<List<Map<String, dynamic>>> getBooks(
+    int ownerId, {
+    String? searchQuery,
+    String? sortBy,
+    String? sortOrder, // 'ASC' or 'DESC'
+    String? filterStatus,
+  }) async {
+    Database db = await instance.database;
+    List<String> whereClauses = ['$columnOwnerId = ?'];
+    List<dynamic> whereArgs = [ownerId];
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      whereClauses.add('($columnTitle LIKE ? OR $columnAuthors LIKE ?)');
+      whereArgs.add('%$searchQuery%');
+      whereArgs.add('%$searchQuery%');
+    }
+
+    if (filterStatus != null && filterStatus.isNotEmpty) {
+      whereClauses.add('$columnStatus = ?');
+      whereArgs.add(filterStatus);
+    }
+
+    String? orderByClause;
+    if (sortBy != null && sortBy.isNotEmpty) {
+      String order = (sortOrder == 'DESC') ? 'DESC' : 'ASC';
+      switch (sortBy) {
+        case 'title':
+          orderByClause = '$columnTitle $order';
+          break;
+        case 'manual_start_date':
+          orderByClause = '$columnManualStartDate $order';
+          break;
+        case 'status':
+          orderByClause = '$columnStatus $order';
+          break;
+        case 'created_at':
+          orderByClause = '$columnCreatedAt $order';
+          break;
+        default:
+          orderByClause = '$columnCreatedAt DESC'; // Default sort
+          break;
+      }
+    } else {
+      orderByClause = '$columnCreatedAt DESC'; // Default sort if no sortBy is provided
+    }
+
+    return await db.query(
+      booksTable,
+      where: whereClauses.join(' AND '),
+      whereArgs: whereArgs,
+      orderBy: orderByClause,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getBookById(int id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(booksTable, where: '$columnId = ?', whereArgs: [id]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<int> updateBook(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    int id = row[columnId];
+    return await db.update(booksTable, row, where: '$columnId = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteBook(int id) async {
+    Database db = await instance.database;
+    return await db.delete(booksTable, where: '$columnId = ?', whereArgs: [id]);
+  }
+
+  // ReadLog C.R.U.D.
+  Future<int> insertReadLog(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    return await db.insert(readLogsTable, row);
+  }
+
+  Future<List<Map<String, dynamic>>> getReadLogsForBook(
+    int bookId, {
+    String? sortBy,
+    String? sortOrder, // 'ASC' or 'DESC'
+  }) async {
+    Database db = await instance.database;
+    String? orderByClause;
+    if (sortBy != null && sortBy.isNotEmpty) {
+      String order = (sortOrder == 'DESC') ? 'DESC' : 'ASC';
+      switch (sortBy) {
+        case 'reading_date':
+          orderByClause = '$columnReadingDate $order';
+          break;
+        case 'end_page':
+          orderByClause = '$columnEndPage $order';
+          break;
+        case 'duration':
+          orderByClause = '$columnDuration $order';
+          break;
+        default:
+          orderByClause = '$columnReadingDate DESC'; // Default sort
+          break;
+      }
+    } else {
+      orderByClause = '$columnReadingDate DESC'; // Default sort if no sortBy is provided
+    }
+
+    return await db.query(
+      readLogsTable,
+      where: '$columnBookId = ?',
+      whereArgs: [bookId],
+      orderBy: orderByClause,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getReadLogById(int id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(readLogsTable, where: '$columnId = ?', whereArgs: [id]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<int> updateReadLog(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    int id = row[columnId];
+    return await db.update(readLogsTable, row, where: '$columnId = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteReadLog(int id) async {
+    Database db = await instance.database;
+    return await db.delete(readLogsTable, where: '$columnId = ?', whereArgs: [id]);
   }
 }
