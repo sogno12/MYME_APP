@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -43,7 +44,17 @@ class _EditBookScreenState extends State<EditBookScreen> {
       setState(() {
         _initialData = data;
         _titleController.text = data[DatabaseHelper.columnTitle] ?? '';
-        _authorsController.text = data[DatabaseHelper.columnAuthors] ?? '';
+        
+        String authorsData = data[DatabaseHelper.columnAuthors] ?? '';
+        try {
+          // Try to parse it as a JSON list
+          final List<dynamic> authorsList = jsonDecode(authorsData);
+          _authorsController.text = authorsList.join(', ');
+        } catch (e) {
+          // If it's not a valid JSON, it's probably an old comma-separated string
+          _authorsController.text = authorsData;
+        }
+
         _totalPagesController.text = data[DatabaseHelper.columnTotalPages]?.toString() ?? '';
         _notesController.text = data[DatabaseHelper.columnNotes] ?? '';
 
@@ -144,11 +155,20 @@ class _EditBookScreenState extends State<EditBookScreen> {
 
   void _saveBookChanges() async {
       final now = DateTime.now().toIso8601String();
+
+      // 저자 문자열을 처리하여 JSON 형식으로 변환
+      final List<String> authorsList = _authorsController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final String authorsJson = jsonEncode(authorsList);
+
       final updatedBook = {
         DatabaseHelper.columnId: widget.bookId,
         DatabaseHelper.columnUpdatedAt: now,
         DatabaseHelper.columnTitle: _titleController.text,
-        DatabaseHelper.columnAuthors: _authorsController.text,
+        DatabaseHelper.columnAuthors: authorsJson, // JSON 형식으로 저장
         DatabaseHelper.columnTotalPages: int.tryParse(_totalPagesController.text) ?? 0,
         DatabaseHelper.columnNotes: _notesController.text,
         DatabaseHelper.columnManualStartDate: _selectedStartDate != null ? DateFormat('yyyy/MM/dd').format(_selectedStartDate!) : null,

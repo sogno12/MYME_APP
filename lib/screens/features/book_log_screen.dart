@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:myme_app/database_helper.dart';
 import 'package:myme_app/screens/features/add_book_screen.dart';
@@ -6,7 +7,8 @@ import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:myme_app/screens/features/edit_book_screen.dart';
 
 class BookLogScreen extends StatefulWidget {
-  const BookLogScreen({super.key});
+  final int userId;
+  const BookLogScreen({super.key, required this.userId});
 
   @override
   State<BookLogScreen> createState() => _BookLogScreenState();
@@ -16,8 +18,6 @@ class _BookLogScreenState extends State<BookLogScreen> {
   final dbHelper = DatabaseHelper.instance;
   List<Map<String, dynamic>> _books = [];
   bool _isLoading = true;
-
-  final int _currentUserId = 1; // 'sogno' 사용자의 ID가 1이라고 가정
 
   TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -48,7 +48,7 @@ class _BookLogScreenState extends State<BookLogScreen> {
       _isLoading = true;
     });
     final data = await dbHelper.getBooks(
-      _currentUserId,
+      widget.userId,
       searchQuery: _searchQuery,
       sortBy: _sortBy,
       sortOrder: _sortOrder,
@@ -63,7 +63,7 @@ class _BookLogScreenState extends State<BookLogScreen> {
   void _navigateToAddBook() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => AddBookScreen(currentUserId: _currentUserId),
+        builder: (context) => AddBookScreen(userId: widget.userId),
       ),
     );
 
@@ -275,7 +275,16 @@ class _BookLogScreenState extends State<BookLogScreen> {
         final book = _books[index];
         final bookId = book[DatabaseHelper.columnId];
         final String title = book[DatabaseHelper.columnTitle] ?? '제목 없음';
-        final String authors = book[DatabaseHelper.columnAuthors] ?? '저자 정보 없음';
+        
+        String formattedAuthors;
+        final String authorsData = book[DatabaseHelper.columnAuthors] ?? '저자 정보 없음';
+        try {
+          final List<dynamic> authorsList = jsonDecode(authorsData);
+          formattedAuthors = authorsList.join(', ');
+        } catch (e) {
+          formattedAuthors = authorsData;
+        }
+
         final String? startDate = book[DatabaseHelper.columnManualStartDate];
         final String? endDate = book[DatabaseHelper.columnManualEndDate];
 
@@ -302,7 +311,7 @@ class _BookLogScreenState extends State<BookLogScreen> {
                       children: [
                         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(authors, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                        Text(formattedAuthors, style: const TextStyle(fontSize: 14, color: Colors.grey)),
                         if (dateInfo.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(dateInfo, style: TextStyle(fontSize: 12, color: Colors.grey[600])),

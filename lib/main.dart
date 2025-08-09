@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:myme_app/screens/home_screen.dart';
 import 'package:myme_app/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+Future<void> main() async {
   // main 함수에서 비동기 작업을 수행하기 위해 필요합니다.
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(const MyApp());
 }
 

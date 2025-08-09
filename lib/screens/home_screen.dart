@@ -62,9 +62,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
-    const featureMap = {
+    final featureMap = {
       'book_log': {
-        'widget': BookLogScreen(),
+        'widget': BookLogScreen(userId: userId),
         'icon': Icons.book_outlined,
         'activeIcon': Icons.book,
         'label': '독서기록'
