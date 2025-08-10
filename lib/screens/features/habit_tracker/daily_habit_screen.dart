@@ -167,8 +167,18 @@ class _DailyHabitScreenState extends State<DailyHabitScreen> {
             ),
             onPressed: () => _toggleHabitCompletion(habit),
           ),
-          title: Text(habit.title),
-          subtitle: Text(habit.content),
+          title: Text('${habit.emoji} ${habit.title}'),
+          subtitle: log != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (log.timeValue != null) Text('시간: ${log.timeValue}분'),
+                    if (log.percentageValue != null) Text('달성률: ${log.percentageValue}%'),
+                    if (log.quantityValue != null) Text('횟수: ${log.quantityValue}회'),
+                    if (log.memo != null && log.memo!.isNotEmpty) Text('메모: ${log.memo}'),
+                  ],
+                )
+              : Text(habit.content),
           trailing: IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
@@ -179,6 +189,7 @@ class _DailyHabitScreenState extends State<DailyHabitScreen> {
                     userId: widget.userId,
                     habitId: habit.id,
                     log: log, // Pass the existing log if it exists
+                    initialDate: log == null ? _selectedDate : null, // Pass _selectedDate if creating new log
                   ),
                 ),
               );

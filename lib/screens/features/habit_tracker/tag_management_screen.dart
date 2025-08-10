@@ -79,7 +79,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('태그 삭제'),
-          content: const Text('이 태그를 정말 삭제하시겠습니까?\n이 태그가 연결된 모든 습관에서도 제거됩니다.'),
+          content: const Text('이 태그를 정말 삭제하시겠습니까? 이 태그는 습관과의 연결에서만 제거되며, 습관 자체는 삭제되지 않습니다.'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),

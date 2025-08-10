@@ -3,6 +3,7 @@ import 'package:myme_app/database_helper.dart';
 import 'package:myme_app/models/habit_model.dart';
 import 'package:myme_app/models/tag_model.dart';
 import 'package:uuid/uuid.dart';
+import 'package:myme_app/screens/features/habit_tracker/emoji_selection_dialog.dart';
 
 class HabitFormScreen extends StatefulWidget {
   final int userId;
@@ -192,6 +193,21 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
     setState(() {}); // Rebuild the main screen to reflect selected tags
   }
 
+  Future<void> _selectEmoji() async {
+    final String? selectedEmoji = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return EmojiSelectionDialog(currentEmoji: _emojiController.text);
+      },
+    );
+
+    if (selectedEmoji != null) {
+      setState(() {
+        _emojiController.text = selectedEmoji;
+      });
+    }
+  }
+
   Future<void> _saveHabit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
@@ -221,7 +237,7 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
         await dbHelper.insertHabit(habit);
       }
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(habit);
     }
   }
 
@@ -265,12 +281,14 @@ class _HabitFormScreenState extends State<HabitFormScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16.0),
-            TextFormField(
-              controller: _emojiController,
-              decoration: const InputDecoration(
-                labelText: '이모지 (예: 😊)',
-                border: OutlineInputBorder(),
+            ListTile(
+              title: const Text('이모지'),
+              subtitle: Text(
+                _emojiController.text.isNotEmpty ? _emojiController.text : '이모지를 선택하세요',
+                style: const TextStyle(fontSize: 24),
               ),
+              trailing: const Icon(Icons.emoji_emotions_outlined),
+              onTap: _selectEmoji,
             ),
             const SizedBox(height: 16.0),
             ListTile(

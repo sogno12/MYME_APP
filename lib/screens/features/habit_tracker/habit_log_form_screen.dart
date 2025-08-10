@@ -7,8 +7,9 @@ class HabitLogFormScreen extends StatefulWidget {
   final int userId;
   final String habitId;
   final HabitLog? log;
+  final DateTime? initialDate;
 
-  const HabitLogFormScreen({Key? key, required this.userId, required this.habitId, this.log}) : super(key: key);
+  const HabitLogFormScreen({Key? key, required this.userId, required this.habitId, this.log, this.initialDate}) : super(key: key);
 
   @override
   _HabitLogFormScreenState createState() => _HabitLogFormScreenState();
@@ -40,7 +41,7 @@ class _HabitLogFormScreenState extends State<HabitLogFormScreen> {
       _percentageValueController = TextEditingController(text: widget.log!.percentageValue?.toString());
       _quantityValueController = TextEditingController(text: widget.log!.quantityValue?.toString());
     } else {
-      _selectedDate = DateTime.now();
+      _selectedDate = widget.initialDate ?? DateTime.now();
       _memoController = TextEditingController();
       _isCompleted = true;
       _timeValueController = TextEditingController();

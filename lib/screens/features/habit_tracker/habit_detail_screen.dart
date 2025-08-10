@@ -45,9 +45,12 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
 
     if (updatedHabit != null) {
+      print('Habit updated: ${updatedHabit.title}'); // Debug print
       setState(() {
         _currentHabit = updatedHabit;
       });
+    } else {
+      print('Habit update cancelled or failed.'); // Debug print
     }
   }
 
