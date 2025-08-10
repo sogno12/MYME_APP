@@ -199,7 +199,7 @@ class _BookLogScreenState extends State<BookLogScreen> {
   }
 
   bool get _isFilterActive {
-    return _searchQuery.isNotEmpty ||
+    return _searchController.text.isNotEmpty ||
         _sortBy != 'created_at' ||
         _sortOrder != 'DESC' ||
         _filterStatus != null;

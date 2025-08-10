@@ -230,7 +230,7 @@ class _AddReadLogScreenState extends State<AddReadLogScreen> {
                   if (endPage == null || endPage <= 0) {
                     return '유효한 페이지 숫자를 입력해주세요.';
                   }
-                  if (endPage > totalPages) {
+                  if (totalPages > 0 && endPage > totalPages) {
                     return '총 페이지($totalPages)를 초과할 수 없습니다.';
                   }
                   return null;
