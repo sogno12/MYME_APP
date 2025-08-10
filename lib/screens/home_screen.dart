@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // 피처 스크린 임포트
 import 'package:myme_app/screens/features/book_log_screen.dart';
-import 'package:myme_app/screens/features/habit_tracker_screen.dart';
+import 'package:myme_app/screens/features/habit_tracker/daily_habit_screen.dart';
 import 'package:myme_app/screens/features/todo_list_screen.dart';
 import 'package:myme_app/screens/features/memory_tracker_screen.dart';
 
@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'label': '독서기록'
       },
       'habit_tracker': {
-        'widget': HabitTrackerScreen(),
+        'widget': DailyHabitScreen(userId: userId),
         'icon': Icons.check_circle_outline,
         'activeIcon': Icons.check_circle,
         'label': '습관'

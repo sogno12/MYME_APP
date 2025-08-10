@@ -5,10 +5,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:myme_app/models/habit_model.dart';
+import 'package:myme_app/models/habit_log_model.dart';
+import 'package:myme_app/models/tag_model.dart';
 
 class DatabaseHelper {
   static final _databaseName = "MyMe.db";
-  static final _databaseVersion = 7;
+  static final _databaseVersion = 8;
 
   // --- 테이블 이름 ---
   static final usersTable = 'users';
@@ -16,6 +19,11 @@ class DatabaseHelper {
   static final userSettingsTable = 'user_settings';
   static final booksTable = 'books';
   static final readLogsTable = 'read_logs';
+  static final habitsTable = 'habits';
+  static final habitLogsTable = 'habit_logs';
+  static final tagsTable = 'tags';
+  static final habitTagsTable = 'habit_tags';
+
 
   // --- 공통 컬럼 ---
   static final columnId = '_id';
@@ -151,6 +159,70 @@ class DatabaseHelper {
             FOREIGN KEY ($columnBookId) REFERENCES $booksTable ($columnId) ON DELETE CASCADE
           )
           ''');
+    
+    await db.execute('''
+      CREATE TABLE $habitsTable (
+        id TEXT PRIMARY KEY,
+        $columnCreatedAt TEXT NOT NULL,
+        $columnUpdatedAt TEXT NOT NULL,
+        $columnOwnerId INTEGER NOT NULL,
+        $columnCreatedBy INTEGER NOT NULL,
+        $columnUpdatedBy INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT,
+        emoji TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        tracking_type TEXT NOT NULL,
+        goal_unit TEXT,
+        show_log_editor_on_check INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY ($columnOwnerId) REFERENCES $usersTable ($columnId) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $habitLogsTable (
+        id TEXT PRIMARY KEY,
+        habit_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        memo TEXT,
+        is_completed INTEGER NOT NULL DEFAULT 1,
+        time_value INTEGER,
+        percentage_value INTEGER,
+        quantity_value INTEGER,
+        $columnCreatedAt TEXT NOT NULL,
+        $columnUpdatedAt TEXT NOT NULL,
+        $columnOwnerId INTEGER NOT NULL,
+        $columnCreatedBy INTEGER NOT NULL,
+        $columnUpdatedBy INTEGER NOT NULL,
+        FOREIGN KEY (habit_id) REFERENCES $habitsTable (id) ON DELETE CASCADE,
+        FOREIGN KEY ($columnOwnerId) REFERENCES $usersTable ($columnId) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $tagsTable (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        $columnCreatedAt TEXT NOT NULL,
+        $columnUpdatedAt TEXT NOT NULL,
+        $columnOwnerId INTEGER NOT NULL,
+        $columnCreatedBy INTEGER NOT NULL,
+        $columnUpdatedBy INTEGER NOT NULL,
+        FOREIGN KEY ($columnOwnerId) REFERENCES $usersTable ($columnId) ON DELETE CASCADE,
+        UNIQUE(name, $columnOwnerId)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $habitTagsTable (
+        habit_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        PRIMARY KEY (habit_id, tag_id),
+        FOREIGN KEY (habit_id) REFERENCES $habitsTable (id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES $tagsTable (id) ON DELETE CASCADE
+      )
+    ''');
 
     await _insertDefaultData(db);
   }
@@ -190,6 +262,10 @@ class DatabaseHelper {
     await db.execute('DROP TABLE IF EXISTS $userSettingsTable');
     await db.execute('DROP TABLE IF EXISTS $booksTable');
     await db.execute('DROP TABLE IF EXISTS $readLogsTable');
+    await db.execute('DROP TABLE IF EXISTS $habitsTable');
+    await db.execute('DROP TABLE IF EXISTS $habitLogsTable');
+    await db.execute('DROP TABLE IF EXISTS $tagsTable');
+    await db.execute('DROP TABLE IF EXISTS $habitTagsTable');
     await _onCreate(db, newVersion);
   }
 
@@ -428,5 +504,150 @@ class DatabaseHelper {
   Future<int> deleteReadLog(int id) async {
     Database db = await instance.database;
     return await db.delete(readLogsTable, where: '$columnId = ?', whereArgs: [id]);
+  }
+
+  // --- Habit Tracker 관련 함수 ---
+
+  // Habit C.R.U.D.
+  Future<void> insertHabit(Habit habit) async {
+    Database db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.insert(habitsTable, habit.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      await _updateHabitTags(txn, habit.id, habit.tags);
+    });
+  }
+
+  Future<Habit?> getHabitById(String id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(habitsTable, where: 'id = ?', whereArgs: [id]);
+    if (res.isNotEmpty) {
+      final habitMap = res.first;
+      final List<Tag> tags = await _getTagsForHabit(db, id);
+      return Habit.fromMap(habitMap)..tags = tags;
+    }
+    return null;
+  }
+
+  Future<List<Habit>> getAllHabits(int ownerId) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(
+      habitsTable,
+      where: '$columnOwnerId = ?',
+      whereArgs: [ownerId],
+      orderBy: '$columnCreatedAt DESC',
+    );
+    List<Habit> habits = [];
+    for (var map in res) {
+      final List<Tag> tags = await _getTagsForHabit(db, map['id']);
+      habits.add(Habit.fromMap(map)..tags = tags);
+    }
+    return habits;
+  }
+
+  Future<void> updateHabit(Habit habit) async {
+    Database db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.update(habitsTable, habit.toMap(), where: 'id = ?', whereArgs: [habit.id]);
+      await _updateHabitTags(txn, habit.id, habit.tags);
+    });
+  }
+
+  Future<int> deleteHabit(String id) async {
+    Database db = await instance.database;
+    return await db.delete(habitsTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Habit-Tag Linking
+  Future<void> _updateHabitTags(Transaction txn, String habitId, List<Tag> tags) async {
+    await txn.delete(habitTagsTable, where: 'habit_id = ?', whereArgs: [habitId]);
+    for (var tag in tags) {
+      await txn.insert(habitTagsTable, {'habit_id': habitId, 'tag_id': tag.id});
+    }
+  }
+
+  Future<List<Tag>> _getTagsForHabit(Database db, String habitId) async {
+    final List<Map<String, dynamic>> tagMaps = await db.rawQuery('''
+      SELECT T.* FROM $tagsTable T
+      INNER JOIN $habitTagsTable HT ON T.id = HT.tag_id
+      WHERE HT.habit_id = ?
+    ''', [habitId]);
+    return tagMaps.map((map) => Tag.fromMap(map)).toList();
+  }
+
+  // HabitLog C.R.U.D.
+  Future<void> insertHabitLog(HabitLog log) async {
+    Database db = await instance.database;
+    await db.insert(habitLogsTable, log.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<HabitLog?> getHabitLogById(String id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(habitLogsTable, where: 'id = ?', whereArgs: [id]);
+    return res.isNotEmpty ? HabitLog.fromMap(res.first) : null;
+  }
+
+  Future<List<HabitLog>> getHabitLogsForHabit(String habitId) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(
+      habitLogsTable,
+      where: 'habit_id = ?',
+      whereArgs: [habitId],
+      orderBy: 'date DESC',
+    );
+    return res.map((map) => HabitLog.fromMap(map)).toList();
+  }
+
+  Future<HabitLog?> getHabitLogForDate(String habitId, DateTime date) async {
+    Database db = await instance.database;
+    final dateString = date.toIso8601String().split('T')[0]; // YYYY-MM-DD
+    List<Map<String, dynamic>> res = await db.query(
+      habitLogsTable,
+      where: 'habit_id = ? AND date LIKE ?',
+      whereArgs: [habitId, '$dateString%'],
+    );
+    return res.isNotEmpty ? HabitLog.fromMap(res.first) : null;
+  }
+
+  Future<void> updateHabitLog(HabitLog log) async {
+    Database db = await instance.database;
+    await db.update(habitLogsTable, log.toMap(), where: 'id = ?', whereArgs: [log.id]);
+  }
+
+  Future<int> deleteHabitLog(String id) async {
+    Database db = await instance.database;
+    return await db.delete(habitLogsTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Tag C.R.U.D.
+  Future<void> insertTag(Tag tag) async {
+    Database db = await instance.database;
+    await db.insert(tagsTable, tag.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Tag?> getTagById(String id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(tagsTable, where: 'id = ?', whereArgs: [id]);
+    return res.isNotEmpty ? Tag.fromMap(res.first) : null;
+  }
+
+  Future<List<Tag>> getAllTags(int ownerId) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(
+      tagsTable,
+      where: '$columnOwnerId = ?',
+      whereArgs: [ownerId],
+      orderBy: 'name ASC',
+    );
+    return res.map((map) => Tag.fromMap(map)).toList();
+  }
+
+  Future<void> updateTag(Tag tag) async {
+    Database db = await instance.database;
+    await db.update(tagsTable, tag.toMap(), where: 'id = ?', whereArgs: [tag.id]);
+  }
+
+  Future<int> deleteTag(String id) async {
+    Database db = await instance.database;
+    return await db.delete(tagsTable, where: 'id = ?', whereArgs: [id]);
   }
 }
