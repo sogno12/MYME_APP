@@ -4,6 +4,7 @@ import 'package:myme_app/screens/login_screen.dart';
 import 'package:myme_app/screens/system_settings_screen.dart';
 import 'package:myme_app/screens/user_settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myme_app/screens/user_profile_edit_screen.dart';
 
 // 피처 스크린 임포트
 import 'package:myme_app/screens/features/book_log_screen.dart';
@@ -184,6 +185,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     currentAccountPicture: CircleAvatar(
                       child: Text(avatarLetter, style: const TextStyle(fontSize: 24)),
                     ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: const Text('내 정보 수정'),
+                    onTap: () async {
+                      Navigator.pop(context); // Close the drawer
+                      if (_userData != null) {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => UserProfileEditScreen(userId: _userData![DatabaseHelper.columnId]),
+                          ),
+                        );
+                        // After returning from edit screen, refresh user data in drawer
+                        _loadUserData();
+                      }
+                    },
                   ),
                 ],
               ),

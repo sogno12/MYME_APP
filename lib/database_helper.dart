@@ -96,7 +96,11 @@ class DatabaseHelper {
             $columnPassword TEXT NOT NULL,
             $columnName TEXT,
             $columnNickname TEXT,
-            $columnIsAdmin INTEGER NOT NULL DEFAULT 0
+            $columnIsAdmin INTEGER NOT NULL DEFAULT 0,
+            $columnCreatedAt TEXT NOT NULL,
+            $columnUpdatedAt TEXT NOT NULL,
+            $columnCreatedBy INTEGER NOT NULL,
+            $columnUpdatedBy INTEGER NOT NULL
           )
           ''');
     
@@ -238,12 +242,17 @@ class DatabaseHelper {
     final password = '1234';
     final bytes = utf8.encode(password);
     final hashedPassword = sha256.convert(bytes).toString();
+    final now = DateTime.now().toIso8601String();
 
     final sognoUserId = await db.insert(usersTable, {
       columnEmail: 'sogno',
       columnPassword: hashedPassword,
       columnNickname: 'sogno',
-      columnIsAdmin: 1
+      columnIsAdmin: 1,
+      columnCreatedAt: now,
+      columnUpdatedAt: now,
+      columnCreatedBy: 1, // Assuming initial user ID is 1
+      columnUpdatedBy: 1, // Assuming initial user ID is 1
     });
 
     final systemSettings = await db.query(systemSettingsTable);
@@ -299,6 +308,18 @@ class DatabaseHelper {
         where: '$columnEmail = ?',
         whereArgs: [email]);
     return res.isNotEmpty;
+  }
+
+  Future<Map<String, dynamic>?> getUserById(int id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> res = await db.query(usersTable, where: '$columnId = ?', whereArgs: [id]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<int> updateUser(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    int id = row[columnId]; // Assuming row contains the _id
+    return await db.update(usersTable, row, where: '$columnId = ?', whereArgs: [id]);
   }
 
   // --- System Settings 관련 함수 ---
